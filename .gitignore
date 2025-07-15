@@ -1,1 +1,14 @@
 .env
+
+downloadData.py
+prepareData.py
+
+.vscode/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+binance_data_BTCUSDT_2024-07-01_to_2025-07-14.csv
+btcusdData.csv
+trainingData.csv

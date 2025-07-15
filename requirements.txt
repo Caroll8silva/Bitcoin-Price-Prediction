@@ -1,0 +1,6 @@
+pandas
+python-dotenv
+lightgbm
+arch
+numpy
+scikit-learn
