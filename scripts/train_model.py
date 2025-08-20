@@ -1,58 +1,47 @@
-import lightgbm as lgb
-import pandas as pd
+import sys
 import os
-
-from src.helpers.feature_engineering_helper import create_features_for_training
+import pandas as pd
+import lightgbm as lgb
 from dotenv import load_dotenv
+import matplotlib.pyplot as plt
+import seaborn as sns
+import json
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
+from src.helpers.feature_engineering_helper import create_features_for_training
 
 load_dotenv()
-
 MODEL_PATH = os.getenv("PREDICTION_MODEL_PATH")
-HISTORICAL_DATA_PATH = os.getenv("HISTORICAL_DATA_PATH")
+HISTORICAL_DATA_PATH = "training_data.csv"
+PARAMS_FILE_PATH = "best_params.json"
 
 def train():
-    print("Starting Model training")
-
-    print(f"Loading historical training data from: {HISTORICAL_DATA_PATH}")
-    try:
-        historical_df = pd.read_csv(HISTORICAL_DATA_PATH)
-    except FileNotFoundError:
-        print(f"ERROR: training data file not found at '{HISTORICAL_DATA_PATH}'.")
-        return
-        
-    historical_df['timestamp'] = pd.to_datetime(historical_df['timestamp'])
-    historical_df = historical_df.set_index('timestamp')
-
-    features_df = create_features_for_training(historical_df)
-    
+    print("--- Starting Final Model Training ---")
+    df = pd.read_csv(HISTORICAL_DATA_PATH)
+    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+    df = df.set_index('timestamp')
+    features_df = create_features_for_training(df)
     features_df.dropna(inplace=True)
 
-    X = features_df.drop(columns=['target_price'])
-    y = features_df['target_price']
-
-    print("Training LightGBM model...")
+    y_train = features_df['target']
+    X_train = features_df.drop(columns=['target', 'price'])
     
-    lgbm = lgb.LGBMRegressor(
-        objective='regression_l1',
-        n_estimators=1000,
-        learning_rate=0.05,
-        num_leaves=31,
-        max_depth=-1,
-        min_child_samples=20,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1
-    )
-
-    lgbm.fit(X, y)
-
-    print(f"Saving trained model to: {MODEL_PATH}")
+    print(" Training final LightGBM model on the entire dataset...")
+    try:
+        with open(PARAMS_FILE_PATH, 'r') as f:
+            best_params = json.load(f)
+        print(f"Loaded best parameters from {PARAMS_FILE_PATH}")
+    except FileNotFoundError:
+        print(f" WARNING: '{PARAMS_FILE_PATH}' not found. Using default parameters.")
+        best_params = {}
+    best_params.update({'objective': 'regression_l1', 'metric': 'mae', 'n_estimators': 2000, 'random_state': 42, 'n_jobs': -1})
+    final_model = lgb.LGBMRegressor(**best_params)
+    final_model.fit(X_train, y_train)
+    print(f" Saving final trained model to: {MODEL_PATH}")
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    lgbm.booster_.save_model(MODEL_PATH)
-    
-    print("Training complete.")
-    print(f"Successs. Saved at '{MODEL_PATH}'.")
+    final_model.booster_.save_model(MODEL_PATH)
+    print("Final model training complete.")
 
 if __name__ == "__main__":
     train()

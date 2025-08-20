@@ -4,3 +4,8 @@ lightgbm
 arch
 numpy
 scikit-learn
+matplotlib
+seaborn
+requests
+optuna
+yfinance
